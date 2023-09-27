@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"github.com/skapskap/blogfolio-api/internal/data"
 	"github.com/skapskap/blogfolio-api/internal/database"
 	"log"
 	"net/http"
@@ -24,6 +25,7 @@ type application struct {
 	config config
 	logger *log.Logger
 	db     *sql.DB
+	models data.Models
 }
 
 func main() {
@@ -56,6 +58,7 @@ func main() {
 		config: cfg,
 		logger: logger,
 		db:     db,
+		models: data.NewModels(db),
 	}
 
 	srv := &http.Server{

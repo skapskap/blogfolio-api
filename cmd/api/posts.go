@@ -8,7 +8,34 @@ import (
 )
 
 func (app *application) createPostHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(w, "create a new post")
+	var input struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Status      string `json:"status"`
+	}
+	err := app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+	post := &data.Post{
+		Title:       input.Title,
+		Description: input.Description,
+		Status:      input.Status,
+	}
+
+	err = app.models.Posts.Insert(post)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+	headers := make(http.Header)
+	headers.Set("Location", fmt.Sprintf("/v1/posts/%d", post.ID))
+
+	err = app.writeJSON(w, http.StatusCreated, envelope{"post": post}, headers)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
 }
 
 func (app *application) showPostHandler(w http.ResponseWriter, r *http.Request) {
