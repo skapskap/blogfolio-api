@@ -2,6 +2,7 @@ package data
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 )
 
@@ -32,13 +33,77 @@ func (p PostModel) Insert(post *Post) error {
 }
 
 func (p PostModel) Get(id int64) (*Post, error) {
-	return nil, nil
+	if id < 1 {
+		return nil, ErrRecordNotFound
+	}
+
+	query := `
+	SELECT id, created_at, updated_at, published_at, title, description, status
+	FROM blog
+	WHERE id = $1`
+
+	var post Post
+
+	err := p.DB.QueryRow(query, id).Scan(
+		&post.ID,
+		&post.CreatedAt,
+		&post.UpdatedAt,
+		&post.PublishedAt,
+		&post.Title,
+		&post.Description,
+		&post.Status,
+	)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+	return &post, nil
 }
 
 func (p PostModel) Update(post *Post) error {
-	return nil
+	query := `
+		UPDATE blog
+		SET title = $1, updated_at = NOW(), description = $2, status = $3
+		WHERE id = $4`
+
+	args := []interface{}{
+		post.Title,
+		post.Description,
+		post.Status,
+		post.ID,
+	}
+
+	_, err := p.DB.Exec(query, args...)
+	return err
 }
 
 func (p PostModel) Delete(id int64) error {
+	if id < 1 {
+		return ErrRecordNotFound
+	}
+
+	query := `
+		DELETE from blog
+		WHERE id = $1`
+
+	result, err := p.DB.Exec(query, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return ErrRecordNotFound
+	}
+
 	return nil
 }

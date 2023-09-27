@@ -1,10 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/skapskap/blogfolio-api/internal/data"
 	"net/http"
-	"time"
 )
 
 func (app *application) createPostHandler(w http.ResponseWriter, r *http.Request) {
@@ -41,23 +41,92 @@ func (app *application) createPostHandler(w http.ResponseWriter, r *http.Request
 func (app *application) showPostHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFoundResponse(w, r)
 		return
 	}
 
-	post := data.Post{
-		ID:          id,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-		PublishedAt: time.Now(),
-		Title:       "Construí este portfolio com SvelteKit + Go + TailwindCSS em 3 dias!",
-		Description: "Aqui fica o conteúdo do blog",
-		Status:      "Publicado",
+	post, err := app.models.Posts.Get(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
 	}
 
 	err = app.writeJSON(w, http.StatusOK, envelope{"post": post}, nil)
 	if err != nil {
-		app.logger.Println(err)
-		http.Error(w, "O servidor encontrou um problema e não processou sua requisição", http.StatusInternalServerError)
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) updatePostHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	post, err := app.models.Posts.Get(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	var input struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Status      string `json:"status"`
+	}
+
+	err = app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	post.Title = input.Title
+	post.Description = input.Description
+	post.Status = input.Status
+
+	err = app.models.Posts.Update(post)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"post": post}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) deletePostHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	err = app.models.Posts.Delete(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"mensagem": "post deletado com sucesso"}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
 	}
 }
