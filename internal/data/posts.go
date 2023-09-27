@@ -107,3 +107,40 @@ func (p PostModel) Delete(id int64) error {
 
 	return nil
 }
+
+func (p PostModel) GetAll() ([]*Post, error) {
+	query := `
+		SELECT id, created_at, updated_at, published_at, title, description, status
+		FROM blog`
+
+	rows, err := p.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*Post
+
+	for rows.Next() {
+		var post Post
+		err := rows.Scan(
+			&post.ID,
+			&post.CreatedAt,
+			&post.UpdatedAt,
+			&post.PublishedAt,
+			&post.Title,
+			&post.Description,
+			&post.Status,
+		)
+		if err != nil {
+			return nil, err
+		}
+		posts = append(posts, &post)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return posts, nil
+}
