@@ -1,8 +1,12 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"fmt"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
+	"github.com/skapskap/blogfolio-api/internal/database"
 	"log"
 	"net/http"
 	"os"
@@ -19,10 +23,20 @@ type config struct {
 type application struct {
 	config config
 	logger *log.Logger
+	db     *sql.DB
 }
 
 func main() {
 	var cfg config
+
+	// Verifique se o arquivo .env existe
+	if _, err := os.Stat("./app.env"); err == nil {
+		// Se o arquivo .env existe, carregue as variáveis de ambiente a partir dele
+		err := godotenv.Load("./app.env")
+		if err != nil {
+			log.Fatal("Error loading .env file:", err)
+		}
+	}
 
 	flag.IntVar(&cfg.port, "port", 4869, "Porta da API")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
@@ -30,9 +44,18 @@ func main() {
 
 	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
 
+	db, err := database.SetupDatabase()
+	if err != nil {
+		logger.Fatal(err)
+	}
+	defer db.Close()
+
+	logger.Printf("database connection pool established")
+
 	app := &application{
 		config: cfg,
 		logger: logger,
+		db:     db,
 	}
 
 	srv := &http.Server{
@@ -44,6 +67,6 @@ func main() {
 	}
 
 	logger.Printf("starting %s server on %s", cfg.env, srv.Addr)
-	err := srv.ListenAndServe()
+	err = srv.ListenAndServe()
 	logger.Fatal(err)
 }
